@@ -83,7 +83,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.3.7/js/bootstrap.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/patternfly/3.24.0/js/patternfly.min.js"></script>
-
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.3/purify.min.js" integrity="sha512-Ll+TuDvrWDNNRnFFIM8dOiw7Go7dsHyxRp4RutiIFW/wm3DgDmCnRZow6AqbXnCbpWu93yM1O34q+4ggzGeXVA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script type="text/javascript">
   // State
   let connected = false;
@@ -94,7 +94,20 @@
   const stompClient = new StompJs.Client({
     brokerURL: `${prefix}://${location.host}/gs-guide-websocket`
   });
-
+  
+  function sanitize(string) {
+    const pure = DOMPurify.sanitize(string);
+    return pure;
+  }
+  
+  function sanitizeMessage(chatMessage) {
+    return {
+      ...chatMessage,
+      from: sanitize(chatMessage.from),
+      message: sanitize(chatMessage.message),
+    };
+  }
+  
   stompClient.onConnect = (frame) => {
     let name = $("#name");
     let roomInput = $("#room");
@@ -111,9 +124,8 @@
     });
 
     stompClient.subscribe('/topic/hangman', (m) => {
-      const chatMessage = JSON.parse(m.body);
+      const chatMessage = sanitizeMessage(JSON.parse(m.body));
 
-      // Not implemented yet
       if (chatMessage.room !== room) {
         return;
       }
@@ -185,12 +197,12 @@
     if (connected) {
       let msg = $("#msg");
       const value = msg.val();
-      const chatMessage = {
+      const chatMessage = sanitizeMessage({
         type: value.length === 1 ? "GUESS_LETTER" : "CHAT_MESSAGE",
         from: username,
         room: room,
         message: value
-      };
+      });
       stompClient.publish({
         destination: "/app/guess",
         body: JSON.stringify(chatMessage)
@@ -206,12 +218,12 @@
 
   let startGame = function () {
     if (connected) {
-      const chatMessage = {
+      const chatMessage = sanitizeMessage({
         type: "START_GAME",
         from: username,
         room: room,
         message: "",
-      };
+      });
       stompClient.publish({
         destination: "/app/guess",
         body: JSON.stringify(chatMessage)
