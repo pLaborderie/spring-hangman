@@ -1,5 +1,6 @@
 package com.yui.spring_hangman.service;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,10 +20,15 @@ public class HangmanServiceTest {
     @Autowired
     private HangmanService hangmanService;
 
+    @BeforeEach
+    void setUp() {
+        hangmanService.word = "test";
+        hangmanService.guesses.clear();
+    }
+
     @Test
     public void wordGuessProgress_shouldReplaceUnknownWithUnderscore() {
         // arrange
-        hangmanService.word = "test";
         hangmanService.guesses.add("t");
 
         // act
@@ -34,7 +40,6 @@ public class HangmanServiceTest {
 
     @Test
     public void wrongGuesses_shouldOnlyReturnCharactersNotInWord() {
-        hangmanService.word = "test";
         hangmanService.guesses.add("t");
         hangmanService.guesses.add("p");
 
@@ -46,7 +51,6 @@ public class HangmanServiceTest {
 
     @Test
     public void livesLeft_shouldReturnCorrectNumberOfLives() {
-        hangmanService.word = "test";
         hangmanService.guesses.add("t");
         hangmanService.guesses.add("p");
 
@@ -57,7 +61,6 @@ public class HangmanServiceTest {
 
     @Test
     public void isGameWon_shouldReturnTrueWhenAllLettersGuessed() {
-        hangmanService.word = "test";
         hangmanService.guesses.add("t");
         hangmanService.guesses.add("e");
         hangmanService.guesses.add("s");
@@ -69,7 +72,6 @@ public class HangmanServiceTest {
 
     @Test
     public void isGameLost_shouldReturnTrueWhenNoLivesLeft() {
-        hangmanService.word = "test";
         hangmanService.guesses.add("p");
         hangmanService.guesses.add("q");
         hangmanService.guesses.add("r");
