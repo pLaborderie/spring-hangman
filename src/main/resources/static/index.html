@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Hangman Live!</title>
+  <link rel="stylesheet" type="text/css"
+        href="https://cdnjs.cloudflare.com/ajax/libs/patternfly/3.24.0/css/patternfly.min.css">
+  <link rel="stylesheet" type="text/css"
+        href="https://cdnjs.cloudflare.com/ajax/libs/patternfly/3.24.0/css/patternfly-additions.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@7.0.0/bundles/stomp.umd.min.js"></script>
+
+
+  <style>
+    #chat {
+      resize: none;
+      overflow: hidden;
+      min-height: 300px;
+      max-height: 300px;
+      border: 1px solid darkslategray;
+      margin-bottom: 1em;
+      padding: 1em;
+    }
+
+    .message {
+    }
+
+    .system-message {
+      font-weight: bold;
+    }
+
+    .game-message {
+      white-space: pre-wrap;
+    }
+
+    .user {
+      font-weight: bold;
+      color: cornflowerblue;
+    }
+
+    .system-user {
+      font-weight: bold;
+      color: deeppink;
+    }
+  </style>
+</head>
+
+<body>
+<nav class="navbar navbar-default navbar-pf" role="navigation">
+  <div class="navbar-header">
+    <a class="navbar-brand" href="/">
+      <p><strong>>> Hangman Live!</strong></p>
+    </a>
+  </div>
+</nav>
+<div class="container">
+  <br/>
+  <div class="row">
+    <input id="room" class="col-md-4" type="text" placeholder="room">
+    <br />
+    <br />
+  </div>
+  <div class="row">
+    <input id="name" class="col-md-4" type="text" placeholder="your name">
+    <button id="connect" class="col-md-1 btn btn-primary" type="button">connect</button>
+    <br/>
+    <br/>
+  </div>
+  <div class="row">
+    <div class="col-md-8" id="chat"></div>
+  </div>
+  <div class="row">
+    <input class="col-md-6" id="msg" type="text" placeholder="enter your message">
+    <button class="col-md-1 btn btn-primary" id="send" type="button" disabled>send</button>
+  </div>
+
+  <div class="row">
+    <button class="col-md-1 btn btn-primary" id="start" type="button">start new game</button>
+  </div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.3.7/js/bootstrap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/patternfly/3.24.0/js/patternfly.min.js"></script>
+
+<script type="text/javascript">
+  // State
+  let connected = false;
+  let username = "";
+  let room = "";
+
+  const stompClient = new StompJs.Client({
+    brokerURL: 'ws://localhost:8080/gs-guide-websocket'
+  });
+
+  stompClient.onConnect = (frame) => {
+    let name = $("#name");
+    let roomInput = $("#room");
+    username = name.val();
+    room = roomInput.val();
+    name.attr("disabled", true);
+    roomInput.attr("disabled", true);
+    connected = true;
+    $("#send").attr("disabled", false);
+    console.log('Connected: ' + frame);
+    stompClient.publish({
+      destination: "/app/login",
+      body: JSON.stringify({ from: username, type: "USER_JOINED", room: room, message: "" })
+    });
+
+    stompClient.subscribe('/topic/hangman', (m) => {
+      const chatMessage = JSON.parse(m.body);
+
+      // Not implemented yet
+      if (chatMessage.room !== room) {
+        return;
+      }
+
+      let chat = $("#chat");
+      switch (chatMessage.type) {
+        case "USER_JOINED":
+          if (chatMessage.from !== username) {
+            chat.append(`<span class='system-message'>${chatMessage.from} joined the chatroom.</span><br>`);
+          } else {
+            chat.append(`<span class='message'></span><span class='system-user'>System</span> : Howdy <span class="user">${chatMessage.from}</span>!.</span><br>`);
+          }
+          break;
+        case "USER_LEFT":
+          chat.append(`<span class='system-message'>${chatMessage.from} left the chatroom.</span><br>`);
+          break;
+        case "CHAT_MESSAGE":
+          chat.append(`<span class='message'></span><span class='user'>${chatMessage.from}</span> : ${chatMessage.message} </span><br>`);
+          break;
+        case "GAME_STATE":
+          chat.append(`<pre class="game-message">${chatMessage.message}</pre><br>`);
+          break;
+      }
+      scrollToBottom();
+    });
+  };
+
+  stompClient.onWebSocketError = (error) => {
+    console.error('Error with websocket', error);
+  };
+
+  stompClient.onStompError = (frame) => {
+    console.error('Broker reported error: ' + frame.headers['message']);
+    console.error('Additional details: ' + frame.body);
+  };
+
+  function connect() {
+    stompClient.activate();
+  }
+
+  $(document).ready(function () {
+    let name = $("#name");
+
+    $("#connect").click(connect);
+    $("#send").click(send);
+    $("#start").click(startGame);
+
+    name.keypress(function (event) {
+      if (event.keyCode === 13 || event.which === 13) {
+        username = name.val();
+        connect();
+      }
+    });
+
+    $("#msg").keypress(function (event) {
+      if (event.keyCode === 13 || event.which === 13) {
+        send();
+      }
+    });
+
+    $("#chat").change(function () {
+      scrollToBottom();
+    });
+
+    name.focus();
+  });
+
+  let send = function () {
+    if (connected) {
+      let msg = $("#msg");
+      const value = msg.val();
+      const chatMessage = {
+        type: value.length === 1 ? "GUESS_LETTER" : "CHAT_MESSAGE",
+        from: username,
+        room: room,
+        message: value
+      };
+      stompClient.publish({
+        destination: "/app/guess",
+        body: JSON.stringify(chatMessage)
+      });
+      msg.val("");
+    }
+  };
+
+  let scrollToBottom = function () {
+    let chat = $('#chat');
+    chat.scrollTop(chat[0].scrollHeight);
+  };
+
+  let startGame = function () {
+    if (connected) {
+      const chatMessage = {
+        type: "START_GAME",
+        from: username,
+        room: room,
+        message: "",
+      };
+      stompClient.publish({
+        destination: "/app/guess",
+        body: JSON.stringify(chatMessage)
+      });
+    }
+  }
+
+</script>
+</body>
+
+</html>
