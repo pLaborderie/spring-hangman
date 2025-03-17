@@ -92,7 +92,7 @@
 
   const prefix = location.protocol === 'http:' ? 'ws' : 'wss';
   const stompClient = new StompJs.Client({
-    brokerURL: `${prefix}://${location.host}${location.pathname}gs-guide-websocket`
+    brokerURL: `${prefix}://${location.host}${location.pathname}gs-guide-websocket`.replace(/\/\//g, "/")
   });
   
   function sanitize(string) {
